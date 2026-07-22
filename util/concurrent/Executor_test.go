@@ -1,0 +1,38 @@
+package concurrent_test
+
+import (
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/go-jang/go/lang"
+	"github.com/go-jang/go/util/concurrent"
+)
+
+func TestExecutorWithPanicHandling(t *testing.T) {
+	t.Skip("for manual run")
+	exec := concurrent.NewExecutor[int](10)
+
+	fmt.Printf("Submit %v\n", time.Now())
+	futures := []concurrent.Future[int]{}
+	for i := 0; i < 50; i++ {
+		futures = append(futures, exec.Submit(func() int {
+			time.Sleep(time.Second)
+			lang.Assert(i%2 != 0, "simulated panic %d", i)
+			return i * i
+		}))
+	}
+	exec.Close()
+
+	fmt.Printf("Consume %v\n", time.Now())
+	for i, f := range futures {
+		res, err := f.Result()
+		// fmt.Printf("%d: %v, %v\n", i, res, err)
+		if i%2 == 0 {
+			lang.Assert(err != nil, "expected panic for index %d, got result %d", i, res)
+		} else {
+			lang.Assert(err == nil, "unexpected error for index %d: %v", i, err)
+		}
+	}
+	fmt.Printf("Finish %v\n", time.Now())
+}
