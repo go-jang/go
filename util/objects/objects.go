@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"unsafe"
+
+	"github.com/go-errr/go/err"
 )
 
 func ToString(o any) string {
@@ -87,6 +89,32 @@ func HashCode(o any) int {
 	bytes := unsafe.Slice((*byte)(ptr), size)
 
 	return int(Fnv1a64(bytes))
+}
+
+func RequireNonNil[T any](value *T, format string, args ...any) *T {
+	if value == nil {
+		panic(err.NewAssertionError(fmt.Sprintf(format, args...)))
+	}
+	return value
+}
+
+func FirstNonNil[T any](values ...*T) *T {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+
+func FirstNonZero[T comparable](values ...T) T {
+	var zero T
+	for _, value := range values {
+		if value != zero {
+			return value
+		}
+	}
+	return zero
 }
 
 func Fnv1a64String(s string) uint64 {

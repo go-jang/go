@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-jang/go/util/objects"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,4 +94,17 @@ func Test_HashCode(t *testing.T) {
 		slice2 = append(slice1, 1)
 		require.NotEqual(t, objects.HashCode(slice1), objects.HashCode(slice2))
 	})
+}
+
+func TestFirstNonNil(t *testing.T) {
+	var v1 int
+	v2 := 42
+	assert.Equal(t, 0, *objects.FirstNonNil(nil, &v1, &v2))
+}
+
+func TestFirstNonZero(t *testing.T) {
+	var v1 int
+	v2 := 42
+	assert.Equal(t, 0, *objects.FirstNonZero(nil, &v1, &v2))
+	assert.Equal(t, "0", objects.FirstNonZero("", "0", "1"))
 }
