@@ -30,7 +30,12 @@ func (this *PatternProcessor) ProcessRecursive(str string, recursive bool) any {
 	}
 	//nolint
 	before, resolved := str, str
+	seen := make(map[string]bool)
 	for {
+		if seen[resolved] {
+			panic(err.NewIllegalStateException(fmt.Sprintf("Recursive pattern processing cycle detected: %s", resolved)))
+		}
+		seen[resolved] = true
 		var sb strings.Builder
 		before = resolved
 		matched := this.regexp.FindAllStringSubmatchIndex(resolved, -1)
