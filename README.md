@@ -86,7 +86,7 @@ This provides natural back-pressure rather than silently creating an unbounded n
 A common use case is submitting a batch of independent tasks to a bounded executor and then collecting their results:
 
 ```go
-executor := concurrent.NewExecutor(4, 16)
+executor := concurrent.NewExecutor(runtime.NumCPU(), 0)
 defer executor.Shutdown()
 
 futures := make([]concurrent.Future[int], 0, len(values))
@@ -128,7 +128,9 @@ executor.Execute(func(ctx context.Context) {
 })
 ```
 
-An uncaught panic from an `Execute` task is handled through the uncaught exception handling mechanism because there is no `Future` through which the caller could observe it.
+Execute is safe for fire-and-forget tasks that may fail. An uncaught panic is handled by the default uncaught exception handler: it is printed to stderr by default, or handled by a custom handler configured through go-errr.
+
+With Submit, failures are captured by the returned Future instead. The caller should eventually call Future.Get() to observe them; ignoring the Future also ignores any task failure it contains.
 
 ### Future
 
@@ -170,10 +172,9 @@ Tasks receive a `context.Context`:
 
 ```go
 future := executor.Submit(func(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-		return
-	case <-doWork():
+	for _, path := range paths {
+		err.Assert(ctx.Err(), "Interrupted")
+		processFile(path)
 	}
 })
 ```
@@ -186,11 +187,18 @@ Calling:
 future.Cancel()
 ```
 
-cancels the Future and interrupts its task through the context.
+cancels the Future and signals interruption to its task through the context.
 
-The Future becomes both done and cancelled, and observing its result reports `CancellationException`.
+Running goroutines are never forcibly terminated. Task code must observe the context at appropriate interruption points when cancellation matters.
 
-Running goroutines are never forcibly terminated. Task code must observe the context when interruption matters.
+When the task observes cancellation, it may unwind through the normal error mechanism. The cancelled Future itself is reported by `Get()` as:
+
+```text
+CancellationException: Task canceled
+Caused by: context canceled
+```
+
+The Future cancellation takes precedence over any error produced by the task while reacting to that cancellation.
 
 ### Shutdown
 
