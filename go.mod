@@ -3,7 +3,7 @@ module github.com/go-jang/go
 go 1.26.2
 
 require (
-	github.com/go-errr/go v1.0.14
+	github.com/go-errr/go v1.0.15
 	github.com/stretchr/testify v1.11.1
 )
 
