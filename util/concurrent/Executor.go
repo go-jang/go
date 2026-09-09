@@ -17,7 +17,7 @@ type Future[T any] interface {
 	Result() (T, error)
 	GetWithTimeout(timeout time.Duration) T
 	ResultWithTimeout(timeout time.Duration) (T, error)
-	Cancel()
+	Cancel() bool
 	IsCancelled() bool
 	IsDone() bool
 }
@@ -91,11 +91,13 @@ func (f *futureImpl[T]) ResultWithTimeout(timeout time.Duration) (T, error) {
 	}
 }
 
-func (f *futureImpl[T]) Cancel() {
-	if f.done.CompareAndSwap(false, true) {
-		f.cancelled.Store(true)
-		f.cancel()
+func (f *futureImpl[T]) Cancel() bool {
+	if !f.done.CompareAndSwap(false, true) {
+		return false
 	}
+	f.cancelled.Store(true)
+	f.cancel()
+	return true
 }
 
 func (f *futureImpl[T]) IsCancelled() bool {

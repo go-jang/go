@@ -184,21 +184,21 @@ Context cancellation plays the role of cooperative interruption.
 Calling:
 
 ```go
-future.Cancel()
+cancelled := future.Cancel()
 ```
 
-cancels the Future and signals interruption to its task through the context.
+attempts to cancel the Future and signals interruption to its task through the context. It returns `true` if the It returns true if the Future was successfully cancelled, or false if it had already completed or been cancelled.
 
-Running goroutines are never forcibly terminated. Task code must observe the context at appropriate interruption points when cancellation matters.
+A successfully cancelled Future is immediately considered both done and cancelled. A running task, however, may continue until it observes the cancelled context. Running goroutines are never forcibly terminated, so task code must observe the context at appropriate interruption points when cancellation matters.
 
-When the task observes cancellation, it may unwind through the normal error mechanism. The cancelled Future itself is reported by `Get()` as:
+The cancelled Future is reported by `Get()` as:
 
 ```text
 CancellationException: Task canceled
 Caused by: context canceled
 ```
 
-The Future cancellation takes precedence over any error produced by the task while reacting to that cancellation.
+Future cancellation takes precedence over any error produced by the task while reacting to that cancellation.
 
 ### Shutdown
 
