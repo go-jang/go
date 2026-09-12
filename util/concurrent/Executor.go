@@ -146,6 +146,8 @@ type Executor struct {
 	shutdown     chan struct{}
 	shutdownOnce sync.Once
 	workers      atomic.Int64
+	active       atomic.Int64
+	completed    atomic.Int64
 	terminated   chan struct{}
 }
 
@@ -183,6 +185,10 @@ func Submit[T any](executor *Executor, task func(context.Context) T) Future[T] {
 		cancel: cancel,
 	}
 	wrappedTask := func() {
+		executor.active.Add(1)
+		defer executor.active.Add(-1)
+		defer executor.completed.Add(1)
+
 		defer future.cancel()
 		defer future.done.CompareAndSwap(false, true)
 		defer err.Recover(func(e any) {
@@ -221,6 +227,10 @@ func (this *Executor) Execute(task func(context.Context)) {
 	}
 
 	wrappedTask := func() {
+		this.active.Add(1)
+		defer this.active.Add(-1)
+		defer this.completed.Add(1)
+
 		defer err.Recover()
 		task(this.ctx)
 	}
@@ -314,4 +324,20 @@ func (this *Executor) AwaitTermination(timeout time.Duration) bool {
 	case <-timer.C:
 		return false
 	}
+}
+
+func (this *Executor) PoolSize() int {
+	return int(this.workers.Load())
+}
+
+func (this *Executor) ActiveCount() int {
+	return int(this.active.Load())
+}
+
+func (this *Executor) QueueSize() int {
+	return len(this.tasks)
+}
+
+func (this *Executor) CompletedTaskCount() int64 {
+	return this.completed.Load()
 }
