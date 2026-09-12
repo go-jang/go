@@ -145,6 +145,8 @@ type Executor struct {
 	cancel       context.CancelFunc
 	shutdown     chan struct{}
 	shutdownOnce sync.Once
+	workers      atomic.Int64
+	terminated   chan struct{}
 }
 
 func DefaultExecutor() *Executor {
@@ -160,11 +162,13 @@ func NewExecutor(poolSize, queueSize int) *Executor {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	executor := &Executor{
-		tasks:    make(chan func(), queueSize),
-		ctx:      ctx,
-		cancel:   cancel,
-		shutdown: make(chan struct{}),
+		tasks:      make(chan func(), queueSize),
+		ctx:        ctx,
+		cancel:     cancel,
+		shutdown:   make(chan struct{}),
+		terminated: make(chan struct{}),
 	}
+	executor.workers.Store(int64(poolSize))
 	for i := 0; i < poolSize; i++ {
 		executor.runWorker()
 	}
@@ -229,6 +233,12 @@ func (this *Executor) Execute(task func(context.Context)) {
 
 func (this *Executor) runWorker() {
 	go func() {
+		defer func() {
+			if this.workers.Add(-1) == 0 {
+				close(this.terminated)
+			}
+		}()
+
 		for {
 			select {
 			case task := <-this.tasks:
@@ -265,4 +275,43 @@ func (this *Executor) Shutdown() {
 func (this *Executor) ShutdownNow() {
 	this.cancel()
 	this.Shutdown()
+}
+
+func (this *Executor) IsShutdown() bool {
+	select {
+	case <-this.shutdown:
+		return true
+	default:
+		return false
+	}
+}
+
+func (this *Executor) IsTerminated() bool {
+	select {
+	case <-this.terminated:
+		return true
+	default:
+		return false
+	}
+}
+
+func (this *Executor) AwaitTermination(timeout time.Duration) bool {
+	select {
+	case <-this.terminated:
+		return true
+	default:
+	}
+
+	if timeout <= 0 {
+		return false
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-this.terminated:
+		return true
+	case <-timer.C:
+		return false
+	}
 }

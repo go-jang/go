@@ -58,7 +58,7 @@ import (
 )
 
 func main() {
-	executor := concurrent.NewExecutor(4, 16)
+	executor := concurrent.NewExecutor(runtime.NumCPU(), 0)
 	defer executor.Shutdown()
 
 	future := concurrent.Submit(executor, func(ctx context.Context) int {
@@ -187,7 +187,7 @@ Calling:
 cancelled := future.Cancel()
 ```
 
-attempts to cancel the Future and signals interruption to its task through the context. It returns `true` if the It returns true if the Future was successfully cancelled, or false if it had already completed or been cancelled.
+attempts to cancel the Future and signals interruption to its task through the context. It returns `true` if the Future was successfully cancelled, or `false` if it had already completed or been cancelled.
 
 A successfully cancelled Future is immediately considered both done and cancelled. A running task, however, may continue until it observes the cancelled context. Running goroutines are never forcibly terminated, so task code must observe the context at appropriate interruption points when cancellation matters.
 
@@ -208,7 +208,7 @@ Graceful shutdown:
 executor.Shutdown()
 ```
 
-stops accepting new tasks and allows already accepted tasks to finish.
+stops accepting new tasks and allows already accepted tasks to finish. `Shutdown()` returns immediately and does not wait for the executor to terminate.
 
 Immediate shutdown:
 
@@ -216,7 +216,33 @@ Immediate shutdown:
 executor.ShutdownNow()
 ```
 
-additionally interrupts executor tasks through their contexts and prevents queued work from continuing where possible.
+additionally interrupts running tasks through their contexts and prevents queued tasks from being executed. Running tasks may continue until they observe the cancelled context.
+
+The executor state can be inspected with:
+
+```go
+executor.IsShutdown()
+executor.IsTerminated()
+```
+
+`IsShutdown()` reports whether shutdown has been initiated. `IsTerminated()` reports whether all workers have terminated after shutdown.
+
+To wait for termination:
+
+```go
+terminated := executor.AwaitTermination(30 * time.Second)
+```
+
+`AwaitTermination()` returns `true` when all workers terminate before the timeout and `false` when the timeout expires.
+
+A common graceful-then-immediate shutdown sequence is:
+
+```go
+executor.Shutdown()
+if !executor.AwaitTermination(30 * time.Second) {
+	executor.ShutdownNow()
+}
+```
 
 Submissions made after shutdown are rejected with `RejectedExecutionException`.
 
