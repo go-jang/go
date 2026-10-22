@@ -15,16 +15,20 @@ The `lang` package contains small helpers for common language-level patterns.
 Go intentionally has no ternary operator. For simple value selection, `lang.If` provides a concise equivalent:
 
 ```go
-name := lang.If(user != nil, user.Name, "anonymous")
+lang.If(name != "", name, "anonymous")
 ```
 
 Equivalent to:
 
 ```text
-user != nil ? user.Name : "anonymous"
+name != nil ? name : "anonymous"
 ```
 
 It is intended for expressions where a full `if` statement would add more structure than meaning.
+
+```go
+fmt.Printf("Hello, %s!\n", lang.If(name != "", name, "anonymous"))
+```
 
 ### Assertions
 
